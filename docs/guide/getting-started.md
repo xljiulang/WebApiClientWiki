@@ -1,73 +1,17 @@
 ﻿# 快速上手
-
-::: warning
-
-- 如果你的项目所运行的.NET 版本支持`.NET Standard2.1`，并具备依赖注入的环境，我们强烈建议你直接使用全新的`WebApiclientCore`
-- `WebApiClient.JIT`、`WebApiClient.AOT` 目前处于 `修补性维护` 阶段。你仍可用用它来构建项目，但我们仅修补致命性错误而不会为其带来任何功能性的更新。
-
-:::
+ 
 
 ## 依赖环境
-
-对于`WebApiclientCore`，由于基于`.NET Standard2.1`它可以运行在以下平台
-
-- .NET Core 3 +
-- .NET 5、6、7、8
-- Mono 6.4 +
-- Xamarin.iOS 12.16 +
-- Xamarin.Mac 5.16 +
-- Xamarin.Android 10 +
-- 包括但不限于以上列举的实现`.NET Standard2.1`的平台
-
-对于`WebApiClient.JIT`、`WebApiClient.AOT`，由于基于`.NET Standard2.0`它可以运行在以下平台
-
-- .NET Framework 4.6.1+
-- .NET Core 2 +
-- .NET Core 3 +
-- .NET 5、6、7、8
-- Mono 4.6 +
-- Xamarin.iOS 10 +
-- Xamarin.Mac 3 +
-- Xamarin.Android 7 +
-- 通用 Windows 平台 10 +
-- 包括但不限于以上列举的实现`.NET Standard2.0`的平台
-- 额外支持.NET Framework 4.5
+`WebApiclientCore`要求的项目所运行的`.NET`版本支持`.NET Standard2.1`，并具备依赖注入的环境。
 
 ## 从 Nuget 安装
-
-<CodeGroup>
-
-  <CodeGroupItem title=".NET CLI" active>
-
-```bash
-dotnet add package WebApiClientCore
-```
-
-  </CodeGroupItem>
-
-  <CodeGroupItem title=" Package Manager">
-
-```bash
-NuGet\Install-Package WebApiClientCore
-```
-
-  </CodeGroupItem>
-
-  <CodeGroupItem title="PackageReference">
-
-```xml
-<PackageReference Include="WebApiClientCore" Version="2.0.4" />
-```
-
-  </CodeGroupItem>
-    <CodeGroupItem title="Paket CLI">
-
-```bash
-paket add WebApiClientCore
-```
-
-  </CodeGroupItem>
-</CodeGroup>
+| 包名                                                                                                                    | Nuget                                                                                   | 描述                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [WebApiClientCore](https://www.nuget.org/packages/WebApiClientCore)                                                     | ![NuGet logo](https://buildstats.info/nuget/WebApiClientCore)                           | 基础包                                                                    |
+| [WebApiClientCore.Extensions.OAuths](https://www.nuget.org/packages/WebApiClientCore.Extensions.OAuths)                 | ![NuGet logo](https://buildstats.info/nuget/WebApiClientCore.Extensions.OAuths)         | OAuth2 与 token 管理扩展包                                                |
+| [WebApiClientCore.Extensions.NewtonsoftJson](https://www.nuget.org/packages/WebApiClientCore.Extensions.NewtonsoftJson) | ![NuGet logo](https://buildstats.info/nuget/WebApiClientCore.Extensions.NewtonsoftJson) | Json.Net 扩展包                                                           |
+| [WebApiClientCore.Extensions.JsonRpc](https://www.nuget.org/packages/WebApiClientCore.Extensions.JsonRpc)               | ![NuGet logo](https://buildstats.info/nuget/WebApiClientCore.Extensions.JsonRpc)        | JsonRpc 调用扩展包                                                        |
+| [WebApiClientCore.OpenApi.SourceGenerator](https://www.nuget.org/packages/WebApiClientCore.OpenApi.SourceGenerator)     | ![NuGet logo](https://buildstats.info/nuget/WebApiClientCore.OpenApi.SourceGenerator)   | 将本地或远程 OpenApi 文档解析生成 WebApiClientCore 接口代码的 dotnet tool |
 
 ## 声明接口
 
@@ -83,15 +27,18 @@ public interface IUserApi
 }
 ```
 
-## 注册接口
+## 注册和配置接口
 
 AspNetCore Startup
 
 ```csharp
 public void ConfigureServices(IServiceCollection services)
 {
-  //注册
-  services.AddHttpApi<IUserApi>();
+    services.AddHttpApi<IUserApi>().ConfigureHttpApi(o =>
+    {
+        o.UseLogging = Environment.IsDevelopment();
+        o.HttpHost = new Uri("http://localhost:5000/");
+    });
 }
 ```
 
@@ -100,52 +47,45 @@ Console
 ```csharp
 public static void Main(string[] args)
 {
-    //无依赖注入的环境需要自行创建
-    IServiceCollection services = new ServiceCollection();
-    services.AddHttpApi<IUserApi>();
+    // 无依赖注入的环境需要自行创建
+    var services = new ServiceCollection();
+    services.AddHttpApi<IUserApi>().ConfigureHttpApi(o =>
+    {
+        o.UseLogging = Environment.IsDevelopment();
+        o.HttpHost = new Uri("http://localhost:5000/");
+    });
 }
 ```
 
-## 配置
-
+## 全局配置接口
+全局配置可以做为所有接口的默认初始配置
 ```csharp
 public void ConfigureServices(IServiceCollection services)
 {
-  // 注册并配置
-  services.AddHttpApi(typeof(IUserApi), o =>
-  {
-      o.UseLogging = Environment.IsDevelopment();
-      o.HttpHost = new Uri("http://localhost:5000/");
-  });
-  //注册，然后配置
-  services.AddHttpApi<IUserApi>().ConfigureHttpApi(o =>
-  {
-      o.UseLogging = Environment.IsDevelopment();
-      o.HttpHost = new Uri("http://localhost:5000/");
-  });
-  //添加全局配置
-  services.AddWebApiClient().ConfigureHttpApi(o =>
-  {
-      o.UseLogging = Environment.IsDevelopment();
-      o.HttpHost = new Uri("http://localhost:5000/");
-  });
+    services.AddWebApiClient().ConfigureHttpApi(o =>
+    {
+        o.UseLogging = Environment.IsDevelopment();
+        o.HttpHost = new Uri("http://localhost:5000/");
+    });
 }
 ```
 
-## 注入接口
+## 注入和调用接口
 
 ```csharp
-public class MyService
+public class YourService
 {
     private readonly IUserApi userApi;
-    public MyService(IUserApi userApi)
+    public YourService(IUserApi userApi)
     {
         this.userApi = userApi;
     }
 
-    public async Task GetAsync(){
-        //使用接口
-        var user=await userApi.GetAsync(100);
+    public async Task GetAsync()
+    {
+        // 调用接口
+        var user = await userApi.GetAsync(id:"id001");
+        ...
     }
 }
 ```
